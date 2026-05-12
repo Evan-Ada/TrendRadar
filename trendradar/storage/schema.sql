@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS news_items (
     rank INTEGER NOT NULL,
     url TEXT DEFAULT '',
     mobile_url TEXT DEFAULT '',
+    snippet TEXT DEFAULT '',             -- 详情页 OG/描述补全（可选）
     first_crawl_time TEXT NOT NULL,      -- 首次抓取时间
     last_crawl_time TEXT NOT NULL,       -- 最后抓取时间
     crawl_count INTEGER DEFAULT 1,       -- 抓取次数

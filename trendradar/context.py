@@ -186,6 +186,7 @@ class AppContext:
             remote_config = storage_config.get("REMOTE", {})
             local_config = storage_config.get("LOCAL", {})
             pull_config = storage_config.get("PULL", {})
+            mysql_cfg = storage_config.get("MYSQL", {})
 
             self._storage_manager = get_storage_manager(
                 backend_type=storage_config.get("BACKEND", "auto"),
@@ -204,6 +205,14 @@ class AppContext:
                 pull_enabled=pull_config.get("ENABLED", False),
                 pull_days=pull_config.get("DAYS", 7),
                 timezone=self.timezone,
+                mysql_config={
+                    "host": mysql_cfg.get("HOST", ""),
+                    "port": mysql_cfg.get("PORT", 3306),
+                    "user": mysql_cfg.get("USER", ""),
+                    "password": mysql_cfg.get("PASSWORD", ""),
+                    "database": mysql_cfg.get("DATABASE", ""),
+                    "charset": mysql_cfg.get("CHARSET", "utf8mb4"),
+                },
             )
         return self._storage_manager
 
@@ -280,6 +289,9 @@ class AppContext:
             is_first_crawl_func=self.is_first_crawl,
             convert_time_func=self.convert_time_display,
             quiet=quiet,
+            cross_platform_dedupe=self.config.get("CROSS_PLATFORM_DEDUPE_ENABLED", False),
+            cross_dedupe_by_url=self.config.get("CROSS_PLATFORM_DEDUPE_BY_URL", True),
+            cross_dedupe_by_title_if_no_url=self.config.get("CROSS_PLATFORM_DEDUPE_BY_TITLE", True),
         )
 
     # === 报告生成 ===
@@ -758,7 +770,12 @@ class AppContext:
                 time.sleep(batch_interval)
             batch = pending_news[i:i + batch_size]
             titles_for_ai = [
-                {"id": n["id"], "title": n["title"], "source": n.get("source_name", "")}
+                {
+                    "id": n["id"],
+                    "title": n["title"],
+                    "source": n.get("source_name", ""),
+                    "summary": (n.get("snippet") or "").strip(),
+                }
                 for n in batch
             ]
             batch_results = ai_filter.classify_batch(titles_for_ai, active_tags, interests_content)
@@ -776,7 +793,12 @@ class AppContext:
                 time.sleep(batch_interval)
             batch = pending_rss[i:i + batch_size]
             titles_for_ai = [
-                {"id": n["id"], "title": n["title"], "source": n.get("source_name", "")}
+                {
+                    "id": n["id"],
+                    "title": n["title"],
+                    "source": n.get("source_name", ""),
+                    "summary": (n.get("summary") or "").strip(),
+                }
                 for n in batch
             ]
             batch_results = ai_filter.classify_batch(titles_for_ai, active_tags, interests_content)

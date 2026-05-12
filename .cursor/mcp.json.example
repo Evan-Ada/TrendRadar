@@ -21,6 +21,15 @@
     "chrome-devtools": {
       "command": "npx",
       "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+    "mysql": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-mysql-server@latest",
+        "mysql://USER:PASSWORD@HOST:3306/DATABASE",
+        "list,read,utility"
+      ]
     }
   }
 }

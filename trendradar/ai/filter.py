@@ -144,7 +144,7 @@ class AIFilter:
             print(f"[AI筛选][DEBUG] === Prompt 结束 ===")
 
         try:
-            response = self.client.chat(messages)
+            response = self.client.chat(messages, llm_call_label="ai_filter_extract_tags")
 
             if self.debug:
                 print(f"\n[AI筛选][DEBUG] === 标签提取 AI 原始响应 ===")
@@ -221,7 +221,7 @@ class AIFilter:
             print(f"[AI筛选][DEBUG] === Prompt 结束 ===")
 
         try:
-            response = self.client.chat(messages)
+            response = self.client.chat(messages, llm_call_label="ai_filter_update_tags")
 
             if self.debug:
                 print(f"\n[AI筛选][DEBUG] === 标签更新 AI 原始响应 ===")
@@ -338,10 +338,17 @@ class AIFilter:
         )
 
         # 构建新闻列表文本
-        news_list = "\n".join(
-            f"{t['id']}. [{t.get('source', '')}] {t['title']}"
-            for t in titles
-        )
+        lines = []
+        for t in titles:
+            line = f"{t['id']}. [{t.get('source', '')}] {t['title']}"
+            extra = (t.get("summary") or t.get("snippet") or "").strip()
+            if extra:
+                cap = 220
+                if len(extra) > cap:
+                    extra = extra[: cap - 1].rstrip() + "…"
+                line += f" | {extra}"
+            lines.append(line)
+        news_list = "\n".join(lines)
 
         # 填充模板
         user_prompt = self.classify_user
@@ -375,7 +382,7 @@ class AIFilter:
             print(f"[AI筛选][DEBUG] === Prompt 结束 (长度: {sum(len(m['content']) for m in messages)} 字符) ===")
 
         try:
-            response = self.client.chat(messages)
+            response = self.client.chat(messages, llm_call_label="ai_filter_classify_batch")
 
             return self._parse_classify_response(response, titles, tags)
         except Exception as e:

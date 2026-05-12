@@ -1,3 +1,8 @@
+# 在此粘贴你的 config.yaml...
+# 或拖拽文件到编辑器区域
+# 或点击右上角"加载官网最新配置"
+
+
 # ═══════════════════════════════════════════════════════════════
 #                    TrendRadar 配置文件
 #                      Version: 2.2.0
@@ -38,6 +43,9 @@ app:
 #   custom          → 完全自定义，详见 timeline.yaml
 #
 # 详细时间线图请查看 config/timeline.yaml
+#
+# 个人早报基线：建议 schedule.preset 用 morning_evening（早间+晚间汇总），
+# 配合下方 rss.freshness_filter.max_age_days 与各 feed 的 max_items，控制体量与噪声。
 # ===============================================================
 schedule:
   enabled: true                         # 是否启用调度系统
@@ -109,23 +117,49 @@ rss:
                                       # - 0：禁用过滤，推送所有文章
 
   # 单个 feed 可配置 max_age_days 覆盖全局设置：
-  # - 不配置：使用全局 freshness_filter.max_age_days（默认 3 天）
+  # - 不配置：使用上方 rss.freshness_filter.max_age_days
   # - 正整数：覆盖全局设置，只推送此天数内的文章
   # - 0：禁用此频道的新鲜度过滤，推送所有文章
+  #
+  # max_items：每源最多抓取条数（0=不限制）。个人早报建议每源 12～25，总噪声更低。
   feeds:
     - id: "hacker-news"
       name: "Hacker News"
       url: "https://hnrss.org/frontpage"
+      max_items: 20
 
     - id: "ruanyifeng"
       name: "阮一峰的网络日志"
       url: "http://www.ruanyifeng.com/blog/atom.xml"
-      enabled: false                  # 禁用
-      # max_age_days: 3               # 示例：推送 3 天内的文章（更新较慢的博客）
-     
+      max_items: 12
+
     - id: "yahoo-finance"
       name: "雅虎财经"
       url: "https://finance.yahoo.com/news/rssindex"
+      max_items: 15
+
+    - id: "my-rgzn"
+      name: "Bing 新闻：人工智能"
+      url: "https://www.bing.com/news/search?q=%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD&format=RSS"
+      max_items: 15
+
+    - id: "bing-damoxing"
+      name: "Bing 新闻：大模型"
+      url: "https://www.bing.com/news/search?q=%E5%A4%A7%E6%A8%A1%E5%9E%8B&format=RSS"
+      max_items: 15
+
+    - id: "bing-devtools"
+      name: "Bing 新闻：开发者工具"
+      url: "https://www.bing.com/news/search?q=%E5%BC%80%E5%8F%91%E8%80%85%E5%B7%A5%E5%85%B7&format=RSS"
+      max_items: 12
+
+    - id: "bing-github"
+      name: "Bing 新闻：GitHub"
+      url: "https://www.bing.com/news/search?q=GitHub&format=RSS"
+      max_items: 12
+
+
+
 
     # 自定义源示例
     # - id: "custom-feed"
@@ -165,6 +199,12 @@ report:
   rank_threshold: 5                   # 排名高亮阈值（影响展示强调，不改变抓取范围）
 
   max_news_per_keyword: 0             # 每个关键词/标签最大显示数量（0=不限制，仅影响展示裁剪）
+
+  # 跨平台去重（关键词统计路径）：先按标准化 URL，无 URL 时再按规范化标题，减少多平台同题重复
+  cross_platform_dedupe:
+    enabled: true
+    by_normalized_url: true             # 使用 trendradar.utils.url.normalize_url
+    by_canonical_title_if_no_url: true # 无有效链接时用标题字符规范化去重
 
 
 # ===============================================================
@@ -207,8 +247,9 @@ ai_filter:
   batch_interval: 2                       # 分批处理时，每批之间的等待时间（秒）
                                           # 避免频繁调用 API 触发限流，设为 0 则不等待
 
-  min_score: 0.7                          # 推送最低分数阈值（0.0 ~ 1.0）
+  min_score: 0.65                         # 推送最低分数阈值（0.0 ~ 1.0）
                                           # 0 = 不过滤；值越高越严格（推荐先用 0.5~0.7）
+                                          # 略低于 0.7 以利程序员向细分话题的召回，误报多再调回 0.7
 
   # 兴趣描述文件
   # 默认使用 config/ai_interests.txt，无需在此配置
@@ -278,8 +319,8 @@ display:
   #   - AI 分析：由 ai_analysis.include_standalone 开关控制，将完整数据送入 AI 做深度分析
   # 两者共享此处的平台/RSS 配置，但开关互相独立（可只开 AI 分析、不推送展示）
   standalone:
-    platforms: ["zhihu", "wallstreetcn-hot"]     # 热榜平台 ID 列表（如 ["zhihu", "weibo"]）
-    rss_feeds: []                     # RSS 源 ID 列表（如 ["hacker-news"]）
+    platforms: ["zhihu","wallstreetcn-hot","bilibili-hot-search","toutiao","baidu","thepaper","cls-hot","douyin","tieba","weibo","ifeng"] # 热榜平台 ID 列表（如 ["zhihu", "weibo"]）
+    rss_feeds: ["my-rgzn","yahoo-finance","ruanyifeng"] # RSS 源 ID 列表（如 ["hacker-news"]）
     max_items: 20                     # 每个源最多展示条数（0=不限制）
 
 
@@ -362,7 +403,8 @@ storage:
   # - auto: 自动选择（GitHub Actions 且配置了远程存储 → remote，否则 → local）
   # - local: 本地 SQLite + TXT/HTML 文件
   # - remote: 远程云存储（S3 兼容协议，支持 R2/OSS/COS 等）
-  backend: "auto"
+  # - mysql: MySQL（热榜/RSS/AI 筛选表；HTML/TXT 仍写本地 data_dir）
+  backend: "mysql"
 
   # 数据格式选项
   formats:
@@ -397,6 +439,15 @@ storage:
     enabled: false                    # 是否启用启动时自动拉取
     days: 7                           # 拉取最近 N 天的数据
 
+  # MySQL 存储（backend: mysql 时生效；敏感信息若提交 Git 请自行评估风险）
+  mysql:
+    host: "127.0.0.1"
+    port: 3306
+    user: "trendradar"
+    password: ""
+    database: "trendradar"
+    charset: "utf8mb4"
+
 
 # ===============================================================
 # 8. AI 模型配置（共享）
@@ -413,13 +464,13 @@ ai:
   #   - anthropic/claude-3-5-sonnet (Anthropic)
   #   - ollama/llama3 (本地 Ollama)
   # 完整列表: https://docs.litellm.ai/docs/providers
-  # 如果你对于看英文文档比较头疼，那么可以点击页面右下角的 【Ask AI】 ,用中文询问怎么配置 
-  
-  model: "deepseek/deepseek-chat"
+  # 如果你对于看英文文档比较头疼，那么可以点击页面右下角的 【Ask AI】 ,用中文询问怎么配置
+
+  model: "openai/MiniMax-M2.7"
 
   api_key: ""                       # API Key（建议使用环境变量 AI_API_KEY）
-  
-  api_base: ""                      # 自定义 API 端点（可选，大多数情况留空）
+
+  api_base: "https://api.minimaxi.com/v1"                      # 自定义 API 端点（可选，大多数情况留空）
                                     # 示例: https://api.openai.com/v1（自建代理或兼容接口）
                                     #
                                     # 💡 超级重要：连接任意兼容 OpenAI 协议的模型商
@@ -437,8 +488,8 @@ ai:
 
   temperature: 1.0                  # 采样温度 (0.0-2.0)
                                     # 注意：部分模型(如 gpt-5)可能要求必须为 1.0，否则会报错
-  
-  max_tokens: 5000                  # 最大生成 token 数
+
+  max_tokens: 50000                  # 最大生成 token 数
                                     # 注意：如果 API 不支持此参数(报 HTTP 400)，请设为 0 以禁用发送
   # 高级选项
   num_retries: 1                    # 失败重试次数
@@ -495,7 +546,7 @@ ai_analysis:
   mode: "follow_report"
 
   # 分析内容配置
-  max_news_for_analysis: 150        # 热榜+RSS 合计参与分析的新闻数量上限（控制成本关键项）
+  max_news_for_analysis: 50         # 热榜+RSS 合计参与分析的新闻数量上限（控制成本关键项）
                                     # 热榜优先占用配额，RSS 使用剩余配额；独立展示区不受此限制
                                     # 推送消息顶部会显示实际的 AI 分析数供参考
 
@@ -507,8 +558,8 @@ ai_analysis:
                                       # GitHub Action 部署默认推送约 20 次（每小时推送一次）， 约 0.1 元/天
                                       # Docker 部署默认推送 48 次(每半小时推送一次)， 约 0.2 元/天
 
-  include_rss: false                # 是否包含 RSS 内容进行分析
-  
+  include_rss: true                # 是否包含 RSS 内容进行分析
+
   include_standalone: true          # 是否将独立展示区数据纳入 AI 分析
                                     # 数据源列表来自 display.standalone.platforms / display.standalone.rss_feeds
 
@@ -566,6 +617,14 @@ advanced:
     request_interval: 2000            # 请求间隔（毫秒）
     use_proxy: false                  # 是否启用代理
     default_proxy: "http://127.0.0.1:10801"
+
+  # 热榜条目 OG/描述补全（与 RSS 摘要口径类似，写入 news_items.snippet；按需开启，会增加抓取耗时）
+  hotlist_snippet:
+    enabled: false                    # true 时仅对每平台排名前 N 条请求详情页元数据
+    top_n_per_platform: 8
+    max_length: 450                   # 写入前截断长度（与 RSS 摘要量级接近）
+    timeout_seconds: 10
+    request_interval_ms: 280        # 条目间间隔，降低被封风险
 
   # RSS 设置
   rss:

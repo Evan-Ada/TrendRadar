@@ -150,6 +150,39 @@
 [WORD_GROUPS]
 
 # ═══════════════════════════════════════════════════════════════
+#              程序员与 AI（filter.method=keyword 时参与匹配）
+# ═══════════════════════════════════════════════════════════════
+
+[大模型与智能应用]
+大模型
+多模态
+提示工程
+微调
+Agent
+RAG
+MCP
+/\bLLM\b/i
+/\bOpenAI\b|\bChatGPT\b|\bClaude\b|\bGemini\b|\bDeepSeek\b|\bCopilot\b/i
+
+[编程语言与工程]
+GitHub
+DevOps
+CI/CD
+Kubernetes
+Docker
+微服务
+可观测性
+/\bPython\b|\bTypeScript\b|\bRust\b|\bGo\b|\bKotlin\b/i
+
+[开发者工具与平台]
+Cursor
+代码审查
+开发者大会
+API
+Serverless
+
+
+# ═══════════════════════════════════════════════════════════════
 #                         企业与品牌
 # ═══════════════════════════════════════════════════════════════
 

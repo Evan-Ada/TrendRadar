@@ -5,6 +5,7 @@
 支持的存储后端:
 - local: 本地 SQLite + TXT/HTML 文件
 - remote: 远程云存储（S3 兼容协议：R2/OSS/COS/S3 等）
+- mysql: MySQL（结构化数据；HTML/TXT 仍写本地）
 - auto: 根据环境自动选择（GitHub Actions 用 remote，其他用 local）
 """
 
@@ -19,6 +20,14 @@ from trendradar.storage.base import (
 from trendradar.storage.sqlite_mixin import SQLiteStorageMixin
 from trendradar.storage.local import LocalStorageBackend
 from trendradar.storage.manager import StorageManager, get_storage_manager
+
+try:
+    from trendradar.storage.mysql import MySQLStorageBackend
+
+    HAS_MYSQL = True
+except ImportError:
+    MySQLStorageBackend = None
+    HAS_MYSQL = False
 
 # 远程后端可选导入（需要 boto3）
 try:
@@ -43,6 +52,8 @@ __all__ = [
     "LocalStorageBackend",
     "RemoteStorageBackend",
     "HAS_REMOTE",
+    "MySQLStorageBackend",
+    "HAS_MYSQL",
     # 管理器
     "StorageManager",
     "get_storage_manager",

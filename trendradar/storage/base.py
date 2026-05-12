@@ -20,6 +20,7 @@ class NewsItem:
     rank: int = 0                       # 排名
     url: str = ""                       # 链接 URL
     mobile_url: str = ""                # 移动端 URL
+    snippet: str = ""                   # 详情页 OG/描述补全（与 RSS summary 类似，可选）
     crawl_time: str = ""                # 抓取时间（HH:MM 格式）
 
     # 统计信息（用于分析）
@@ -40,6 +41,7 @@ class NewsItem:
             "rank": self.rank,
             "url": self.url,
             "mobile_url": self.mobile_url,
+            "snippet": self.snippet,
             "crawl_time": self.crawl_time,
             "ranks": self.ranks,
             "first_time": self.first_time,
@@ -58,6 +60,7 @@ class NewsItem:
             rank=data.get("rank", 0),
             url=data.get("url", ""),
             mobile_url=data.get("mobile_url", ""),
+            snippet=data.get("snippet", ""),
             crawl_time=data.get("crawl_time", ""),
             ranks=data.get("ranks", []),
             first_time=data.get("first_time", ""),
@@ -271,6 +274,11 @@ class NewsData:
                         existing.url = item.url
                     if not existing.mobile_url and item.mobile_url:
                         existing.mobile_url = item.mobile_url
+                    if item.snippet and (
+                        not existing.snippet
+                        or len(item.snippet) > len(existing.snippet)
+                    ):
+                        existing.snippet = item.snippet
                 else:
                     # 添加新新闻
                     merged_items[source_id][item.title] = item
@@ -556,6 +564,7 @@ def convert_crawl_results_to_news_data(
             ranks = data.get("ranks", [])
             url = data.get("url", "")
             mobile_url = data.get("mobileUrl", "")
+            snippet = data.get("snippet", "")
 
             rank = ranks[0] if ranks else 99
 
@@ -566,6 +575,7 @@ def convert_crawl_results_to_news_data(
                 rank=rank,
                 url=url,
                 mobile_url=mobile_url,
+                snippet=snippet,
                 crawl_time=crawl_time,
                 ranks=ranks,
                 first_time=crawl_time,

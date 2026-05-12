@@ -255,7 +255,7 @@ async def get_trending_topics(
 async def get_latest_rss(
     feeds: Optional[List[str]] = None,
     days: int = 1,
-    limit: int = 50,
+    limit: int = 150,
     include_summary: bool = False
 ) -> str:
     """

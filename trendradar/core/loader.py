@@ -68,11 +68,19 @@ def _load_crawler_config(config_data: Dict) -> Dict:
     advanced = config_data.get("advanced", {})
     crawler_config = advanced.get("crawler", {})
     platforms_config = config_data.get("platforms", {})
+    snippet_cfg = advanced.get("hotlist_snippet", {})
     return {
         "REQUEST_INTERVAL": crawler_config.get("request_interval", 100),
         "USE_PROXY": crawler_config.get("use_proxy", False),
         "DEFAULT_PROXY": crawler_config.get("default_proxy", ""),
         "ENABLE_CRAWLER": platforms_config.get("enabled", True),
+        "HOTLIST_SNIPPET": {
+            "ENABLED": snippet_cfg.get("enabled", False),
+            "TOP_N_PER_PLATFORM": int(snippet_cfg.get("top_n_per_platform", 8)),
+            "MAX_LENGTH": int(snippet_cfg.get("max_length", 450)),
+            "TIMEOUT_SECONDS": float(snippet_cfg.get("timeout_seconds", 10)),
+            "REQUEST_INTERVAL_MS": int(snippet_cfg.get("request_interval_ms", 280)),
+        },
     }
 
 
@@ -84,12 +92,17 @@ def _load_report_config(config_data: Dict) -> Dict:
     sort_by_position_env = _get_env_bool("SORT_BY_POSITION_FIRST")
     max_news_env = _get_env_int("MAX_NEWS_PER_KEYWORD")
 
+    dedupe_cfg = report_config.get("cross_platform_dedupe", {})
+
     return {
         "REPORT_MODE": report_config.get("mode", "daily"),
         "DISPLAY_MODE": report_config.get("display_mode", "keyword"),
         "RANK_THRESHOLD": report_config.get("rank_threshold", 10),
         "SORT_BY_POSITION_FIRST": sort_by_position_env if sort_by_position_env is not None else report_config.get("sort_by_position_first", False),
         "MAX_NEWS_PER_KEYWORD": max_news_env or report_config.get("max_news_per_keyword", 0),
+        "CROSS_PLATFORM_DEDUPE_ENABLED": dedupe_cfg.get("enabled", False),
+        "CROSS_PLATFORM_DEDUPE_BY_URL": dedupe_cfg.get("by_normalized_url", True),
+        "CROSS_PLATFORM_DEDUPE_BY_TITLE": dedupe_cfg.get("by_canonical_title_if_no_url", True),
     }
 
 
@@ -366,6 +379,7 @@ def _load_storage_config(config_data: Dict) -> Dict:
     local = storage.get("local", {})
     remote = storage.get("remote", {})
     pull = storage.get("pull", {})
+    mysql = storage.get("mysql", {})
 
     txt_enabled_env = _get_env_bool("STORAGE_TXT_ENABLED")
     html_enabled_env = _get_env_bool("STORAGE_HTML_ENABLED")
@@ -393,6 +407,14 @@ def _load_storage_config(config_data: Dict) -> Dict:
         "PULL": {
             "ENABLED": pull_enabled_env if pull_enabled_env is not None else pull.get("enabled", False),
             "DAYS": _get_env_int("PULL_DAYS") or pull.get("days", 7),
+        },
+        "MYSQL": {
+            "HOST": _get_env_str("MYSQL_HOST") or mysql.get("host", "127.0.0.1"),
+            "PORT": _get_env_int("MYSQL_PORT") or int(mysql.get("port", 3306) or 3306),
+            "USER": _get_env_str("MYSQL_USER") or mysql.get("user", ""),
+            "PASSWORD": _get_env_str("MYSQL_PASSWORD") or mysql.get("password", ""),
+            "DATABASE": _get_env_str("MYSQL_DATABASE") or mysql.get("database", "trendradar"),
+            "CHARSET": mysql.get("charset", "utf8mb4"),
         },
     }
 

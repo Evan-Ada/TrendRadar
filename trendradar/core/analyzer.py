@@ -8,9 +8,10 @@
 - count_word_frequency: 统计词频
 """
 
-from typing import Dict, List, Tuple, Optional, Callable
+from typing import Dict, List, Tuple, Optional, Callable, Set
 
 from trendradar.core.frequency import matches_word_groups, _word_matches
+from trendradar.utils.dedupe import should_skip_cross_platform
 from trendradar.utils.time import DEFAULT_TIMEZONE
 
 
@@ -106,6 +107,9 @@ def count_word_frequency(
     is_first_crawl_func: Optional[Callable[[], bool]] = None,
     convert_time_func: Optional[Callable[[str], str]] = None,
     quiet: bool = False,
+    cross_platform_dedupe: bool = False,
+    cross_dedupe_by_url: bool = True,
+    cross_dedupe_by_title_if_no_url: bool = True,
 ) -> Tuple[List[Dict], int]:
     """
     统计词频，支持必须词、频率词、过滤词、全局过滤词，并标记新增标题
@@ -220,6 +224,9 @@ def count_word_frequency(
     if new_titles is None:
         new_titles = {}
 
+    seen_cross_urls: Set[str] = set()
+    seen_cross_titles: Set[str] = set()
+
     for group in word_groups:
         group_key = group["group_key"]
         word_stats[group_key] = {"count": 0, "titles": {}}
@@ -233,6 +240,18 @@ def count_word_frequency(
         for title, title_data in titles_data.items():
             if title in processed_titles.get(source_id, {}):
                 continue
+
+            if cross_platform_dedupe:
+                if should_skip_cross_platform(
+                    title_data.get("url", ""),
+                    source_id,
+                    title,
+                    seen_cross_urls,
+                    seen_cross_titles,
+                    by_url=cross_dedupe_by_url,
+                    by_title_if_no_url=cross_dedupe_by_title_if_no_url,
+                ):
+                    continue
 
             # 使用统一的匹配逻辑
             matches_frequency_words = matches_word_groups(
@@ -548,6 +567,7 @@ def count_rss_frequency(
         ]
     """
     from trendradar.utils.time import format_iso_time_friendly
+    from trendradar.utils.url import normalize_url
 
     if not rss_items:
         return [], 0
@@ -565,6 +585,9 @@ def count_rss_frequency(
         for item in new_items:
             if item.get("url"):
                 new_urls.add(item["url"])
+                nu = normalize_url(item["url"], item.get("feed_id", "") or "")
+                if nu:
+                    new_urls.add(nu)
 
     # 初始化词组统计
     word_stats = {}
@@ -582,17 +605,25 @@ def count_rss_frequency(
         key=lambda x: x.get("published_at", ""),
         reverse=True
     )
-    url_to_rank = {item.get("url", ""): idx + 1 for idx, item in enumerate(sorted_items)}
+    url_to_rank: Dict[str, int] = {}
+    for idx, it in enumerate(sorted_items):
+        u = it.get("url", "") or ""
+        fid = it.get("feed_id", "") or ""
+        key = normalize_url(u, fid) if u else u
+        if key and key not in url_to_rank:
+            url_to_rank[key] = idx + 1
 
     for item in rss_items:
         title = item.get("title", "")
         url = item.get("url", "")
+        feed_id = item.get("feed_id", "") or ""
 
-        # 去重
-        if url and url in processed_urls:
+        # 去重（标准化 URL，与热榜存储一致）
+        norm_url = normalize_url(url, feed_id) if url else ""
+        if norm_url and norm_url in processed_urls:
             continue
-        if url:
-            processed_urls.add(url)
+        if norm_url:
+            processed_urls.add(norm_url)
 
         # 使用统一的匹配逻辑
         if not matches_word_groups(title, word_groups, filter_words, global_filters):
@@ -637,10 +668,12 @@ def count_rss_frequency(
                 time_display = format_iso_time_friendly(published_at, timezone, include_date=True) if published_at else ""
 
                 # 判断是否为新增
-                is_new = url in new_urls if url else False
+                is_new = bool(
+                    (url and url in new_urls) or (norm_url and norm_url in new_urls)
+                )
 
                 # 获取排名（基于发布时间顺序）
-                rank = url_to_rank.get(url, 99) if url else 99
+                rank = url_to_rank.get(norm_url, 99) if norm_url else 99
 
                 title_data = {
                     "title": title,

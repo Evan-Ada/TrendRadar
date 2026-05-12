@@ -61,6 +61,7 @@ def read_all_today_titles_from_storage(
                     "ranks": ranks,
                     "url": item.url or "",
                     "mobileUrl": item.mobile_url or "",
+                    "snippet": getattr(item, "snippet", "") or "",
                 }
 
                 title_info[source_id][title] = {
@@ -70,6 +71,7 @@ def read_all_today_titles_from_storage(
                     "ranks": ranks,
                     "url": item.url or "",
                     "mobileUrl": item.mobile_url or "",
+                    "snippet": getattr(item, "snippet", "") or "",
                     "rank_timeline": rank_timeline,
                 }
 

@@ -98,6 +98,16 @@ class SQLiteStorageMixin:
 
         conn.commit()
 
+    def _ensure_news_items_snippet_column(self, conn: sqlite3.Connection) -> None:
+        """为旧版 news_items 表补充 snippet 列（幂等）。"""
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(news_items)")
+        cols = [row[1] for row in cur.fetchall()]
+        if "snippet" in cols:
+            return
+        cur.execute("ALTER TABLE news_items ADD COLUMN snippet TEXT DEFAULT ''")
+        conn.commit()
+
     # ========================================
     # 新闻数据存储
     # ========================================
@@ -116,6 +126,7 @@ class SQLiteStorageMixin:
         try:
             conn = self._get_connection(data.date)
             cursor = conn.cursor()
+            self._ensure_news_items_snippet_column(conn)
 
             # 获取配置时区的当前时间
             now_str = self._get_configured_time().strftime("%Y-%m-%d %H:%M:%S")
@@ -141,6 +152,7 @@ class SQLiteStorageMixin:
 
                 for item in news_list:
                     try:
+                        snippet_val = getattr(item, "snippet", "") or ""
                         # 标准化 URL（去除动态参数，如微博的 band_rank）
                         normalized_url = normalize_url(item.url, source_id) if item.url else ""
 
@@ -181,21 +193,22 @@ class SQLiteStorageMixin:
                                         mobile_url = ?,
                                         last_crawl_time = ?,
                                         crawl_count = crawl_count + 1,
-                                        updated_at = ?
+                                        updated_at = ?,
+                                        snippet = COALESCE(NULLIF(?, ''), snippet)
                                     WHERE id = ?
                                 """, (item.title, item.rank, item.mobile_url,
-                                      data.crawl_time, now_str, existing_id))
+                                      data.crawl_time, now_str, snippet_val, existing_id))
                                 updated_count += 1
                             else:
                                 # 不存在，插入新记录（存储标准化后的 URL）
                                 cursor.execute("""
                                     INSERT INTO news_items
-                                    (title, platform_id, rank, url, mobile_url,
+                                    (title, platform_id, rank, url, mobile_url, snippet,
                                      first_crawl_time, last_crawl_time, crawl_count,
                                      created_at, updated_at)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                                 """, (item.title, source_id, item.rank, normalized_url,
-                                      item.mobile_url, data.crawl_time, data.crawl_time,
+                                      item.mobile_url, snippet_val, data.crawl_time, data.crawl_time,
                                       now_str, now_str))
                                 new_id = cursor.lastrowid
                                 # 记录初始排名
@@ -209,12 +222,12 @@ class SQLiteStorageMixin:
                             # URL 为空的情况，直接插入（不做去重）
                             cursor.execute("""
                                 INSERT INTO news_items
-                                (title, platform_id, rank, url, mobile_url,
+                                (title, platform_id, rank, url, mobile_url, snippet,
                                  first_crawl_time, last_crawl_time, crawl_count,
                                  created_at, updated_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                             """, (item.title, source_id, item.rank, "",
-                                  item.mobile_url, data.crawl_time, data.crawl_time,
+                                  item.mobile_url, snippet_val, data.crawl_time, data.crawl_time,
                                   now_str, now_str))
                             new_id = cursor.lastrowid
                             # 记录初始排名
@@ -334,11 +347,12 @@ class SQLiteStorageMixin:
         try:
             conn = self._get_connection(date)
             cursor = conn.cursor()
+            self._ensure_news_items_snippet_column(conn)
 
             # 获取所有新闻数据（包含 id 用于查询排名历史）
             cursor.execute("""
                 SELECT n.id, n.title, n.platform_id, p.name as platform_name,
-                       n.rank, n.url, n.mobile_url,
+                       n.rank, n.url, n.mobile_url, COALESCE(n.snippet, ''),
                        n.first_crawl_time, n.last_crawl_time, n.crawl_count
                 FROM news_items n
                 LEFT JOIN platforms p ON n.platform_id = p.id
@@ -413,11 +427,12 @@ class SQLiteStorageMixin:
                     rank=row[4],
                     url=row[5] or "",
                     mobile_url=row[6] or "",
-                    crawl_time=row[8],  # last_crawl_time
+                    snippet=row[7] or "",
+                    crawl_time=row[9],  # last_crawl_time
                     ranks=ranks,
-                    first_time=row[7],  # first_crawl_time
-                    last_time=row[8],   # last_crawl_time
-                    count=row[9],       # crawl_count
+                    first_time=row[8],  # first_crawl_time
+                    last_time=row[9],   # last_crawl_time
+                    count=row[10],       # crawl_count
                     rank_timeline=rank_timeline,
                 ))
 
@@ -467,6 +482,7 @@ class SQLiteStorageMixin:
         try:
             conn = self._get_connection(date)
             cursor = conn.cursor()
+            self._ensure_news_items_snippet_column(conn)
 
             # 获取最新的抓取时间
             cursor.execute("""
@@ -484,7 +500,7 @@ class SQLiteStorageMixin:
             # 获取该时间的新闻数据（包含 id 用于查询排名历史）
             cursor.execute("""
                 SELECT n.id, n.title, n.platform_id, p.name as platform_name,
-                       n.rank, n.url, n.mobile_url,
+                       n.rank, n.url, n.mobile_url, COALESCE(n.snippet, ''),
                        n.first_crawl_time, n.last_crawl_time, n.crawl_count
                 FROM news_items n
                 LEFT JOIN platforms p ON n.platform_id = p.id
@@ -556,11 +572,12 @@ class SQLiteStorageMixin:
                     rank=row[4],
                     url=row[5] or "",
                     mobile_url=row[6] or "",
-                    crawl_time=row[8],  # last_crawl_time
+                    snippet=row[7] or "",
+                    crawl_time=row[9],  # last_crawl_time
                     ranks=ranks,
-                    first_time=row[7],  # first_crawl_time
-                    last_time=row[8],   # last_crawl_time
-                    count=row[9],       # crawl_count
+                    first_time=row[8],  # first_crawl_time
+                    last_time=row[9],   # last_crawl_time
+                    count=row[10],       # crawl_count
                     rank_timeline=rank_timeline,
                 ))
 
@@ -1674,9 +1691,11 @@ class SQLiteStorageMixin:
         try:
             conn = self._get_connection(date)
             cursor = conn.cursor()
+            self._ensure_news_items_snippet_column(conn)
 
             cursor.execute("""
-                SELECT n.id, n.title, n.platform_id, p.name as platform_name
+                SELECT n.id, n.title, n.platform_id, p.name as platform_name,
+                       COALESCE(n.snippet, '')
                 FROM news_items n
                 LEFT JOIN platforms p ON n.platform_id = p.id
                 ORDER BY n.id
@@ -1686,6 +1705,7 @@ class SQLiteStorageMixin:
                 {
                     "id": row[0], "title": row[1],
                     "source_id": row[2], "source_name": row[3] or row[2],
+                    "snippet": row[4] or "",
                 }
                 for row in cursor.fetchall()
             ]
@@ -1700,7 +1720,8 @@ class SQLiteStorageMixin:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT i.id, i.title, i.feed_id, f.name as feed_name, i.published_at
+                SELECT i.id, i.title, i.feed_id, f.name as feed_name, i.published_at,
+                       COALESCE(i.summary, '')
                 FROM rss_items i
                 LEFT JOIN rss_feeds f ON i.feed_id = f.id
                 ORDER BY i.id
@@ -1711,6 +1732,7 @@ class SQLiteStorageMixin:
                     "id": row[0], "title": row[1],
                     "source_id": row[2], "source_name": row[3] or row[2],
                     "published_at": row[4] or "",
+                    "summary": row[5] or "",
                 }
                 for row in cursor.fetchall()
             ]

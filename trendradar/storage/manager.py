@@ -39,6 +39,7 @@ class StorageManager:
         pull_enabled: bool = False,
         pull_days: int = 0,
         timezone: str = DEFAULT_TIMEZONE,
+        mysql_config: Optional[dict] = None,
     ):
         """
         初始化存储管理器
@@ -54,6 +55,7 @@ class StorageManager:
             pull_enabled: 是否启用启动时自动拉取
             pull_days: 拉取最近 N 天的数据
             timezone: 时区配置
+            mysql_config: MySQL 连接（host/port/user/password/database 等）
         """
         self.backend_type = backend_type
         self.data_dir = data_dir
@@ -65,6 +67,7 @@ class StorageManager:
         self.pull_enabled = pull_enabled
         self.pull_days = pull_days
         self.timezone = timezone
+        self.mysql_config = mysql_config or {}
 
         self._backend: Optional[StorageBackend] = None
         self._remote_backend: Optional[StorageBackend] = None
@@ -147,10 +150,50 @@ class StorageManager:
             print(f"[存储管理器] 远程后端初始化失败: {e}")
             return None
 
+    def _create_mysql_backend(self) -> Optional[StorageBackend]:
+        """创建 MySQL 存储后端"""
+        try:
+            from trendradar.storage.mysql import MySQLStorageBackend
+
+            cfg = self.mysql_config
+            host = cfg.get("host") or ""
+            user = cfg.get("user") or ""
+            password = cfg.get("password") or ""
+            database = cfg.get("database") or ""
+            if not (host and user and database):
+                print("[存储管理器] MySQL 配置不完整（需要 host、user、database），跳过")
+                return None
+            return MySQLStorageBackend(
+                host=host,
+                port=int(cfg.get("port", 3306)),
+                user=user,
+                password=password,
+                database=database,
+                data_dir=self.data_dir,
+                enable_txt=self.enable_txt,
+                enable_html=self.enable_html,
+                timezone=self.timezone,
+                charset=str(cfg.get("charset", "utf8mb4")),
+            )
+        except ImportError as e:
+            print(f"[存储管理器] MySQL 后端导入失败: {e}")
+            return None
+        except Exception as e:
+            print(f"[存储管理器] MySQL 后端初始化失败: {e}")
+            return None
+
     def get_backend(self) -> StorageBackend:
         """获取存储后端实例"""
         if self._backend is None:
             resolved_type = self._resolve_backend_type()
+
+            if resolved_type == "mysql":
+                self._backend = self._create_mysql_backend()
+                if self._backend:
+                    print("[存储管理器] 使用 MySQL 存储后端")
+                else:
+                    print("[存储管理器] MySQL 不可用，回退到本地存储")
+                    resolved_type = "local"
 
             if resolved_type == "remote":
                 self._backend = self._create_remote_backend()
@@ -380,6 +423,7 @@ def get_storage_manager(
     pull_enabled: bool = False,
     pull_days: int = 0,
     timezone: str = DEFAULT_TIMEZONE,
+    mysql_config: Optional[dict] = None,
     force_new: bool = False,
 ) -> StorageManager:
     """
@@ -396,6 +440,7 @@ def get_storage_manager(
         pull_enabled: 是否启用启动时自动拉取
         pull_days: 拉取最近 N 天的数据
         timezone: 时区配置
+        mysql_config: MySQL 连接配置
         force_new: 是否强制创建新实例
 
     Returns:
@@ -415,6 +460,7 @@ def get_storage_manager(
             pull_enabled=pull_enabled,
             pull_days=pull_days,
             timezone=timezone,
+            mysql_config=mysql_config,
         )
 
     return _storage_manager

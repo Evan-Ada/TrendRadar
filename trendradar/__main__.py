@@ -1069,6 +1069,19 @@ class NewsAnalyzer:
             ids, self.request_interval
         )
 
+        sn_cfg = self.ctx.config.get("HOTLIST_SNIPPET") or {}
+        if sn_cfg.get("ENABLED"):
+            from trendradar.crawler.snippet_fetch import enrich_hotlist_results_snippets
+
+            n_ok = enrich_hotlist_results_snippets(
+                results,
+                top_n_per_platform=int(sn_cfg.get("TOP_N_PER_PLATFORM", 8)),
+                max_length=int(sn_cfg.get("MAX_LENGTH", 450)),
+                timeout_seconds=float(sn_cfg.get("TIMEOUT_SECONDS", 10)),
+                request_interval_ms=int(sn_cfg.get("REQUEST_INTERVAL_MS", 280)),
+            )
+            print(f"[热榜] OG/描述补全: 写入 {n_ok} 条 snippet（每平台前 {sn_cfg.get('TOP_N_PER_PLATFORM', 8)} 条）")
+
         # 转换为 NewsData 格式并保存到存储后端
         crawl_time = self.ctx.format_time()
         crawl_date = self.ctx.format_date()

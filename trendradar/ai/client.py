@@ -7,9 +7,60 @@ AI 客户端模块
 """
 
 import os
+import time
 from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 from litellm import completion
+
+
+def _endpoint_summary(api_base: str) -> str:
+    if not api_base.strip():
+        return "(未设置 api_base，由 LiteLLM 按模型解析)"
+    try:
+        p = urlparse(api_base.strip())
+        if p.netloc:
+            return f"{p.scheme or 'https'}://{p.netloc}"
+    except Exception:
+        pass
+    return "(已配置自定义 endpoint)"
+
+
+def _usage_summary(response: Any) -> str:
+    u = getattr(response, "usage", None)
+    if u is None:
+        return "tokens=(响应未含 usage)"
+    pt = getattr(u, "prompt_tokens", None)
+    ct = getattr(u, "completion_tokens", None)
+    tt = getattr(u, "total_tokens", None)
+    parts = []
+    if pt is not None:
+        parts.append(f"prompt={pt}")
+    if ct is not None:
+        parts.append(f"completion={ct}")
+    if tt is not None:
+        parts.append(f"total={tt}")
+    return " ".join(parts) if parts else "tokens=(无明细)"
+
+
+def _reply_preview(response: Any, limit: int = 120) -> str:
+    try:
+        choice = response.choices[0]
+        content = choice.message.content
+        if isinstance(content, list):
+            content = "".join(
+                item.get("text", str(item)) if isinstance(item, dict) else str(item)
+                for item in content
+            )
+        text = (content or "").strip().replace("\n", " ")
+        if len(text) > limit:
+            return text[: limit - 3] + "..."
+        if not text:
+            fr = getattr(choice, "finish_reason", None)
+            return f"(空回复 finish_reason={fr!r})"
+        return text
+    except Exception:
+        return "(无法读取回复)"
 
 
 class AIClient:
@@ -83,13 +134,37 @@ class AIClient:
         if self.fallback_models:
             params["fallbacks"] = self.fallback_models
 
-        # 合并其他额外参数
+        # 合并其他额外参数（llm_call_label 仅用于日志，不得传给 LiteLLM）
         for key, value in kwargs.items():
             if key not in params:
                 params[key] = value
 
-        # 调用 LiteLLM
-        response = completion(**params)
+        call_label = params.pop("llm_call_label", "chat")
+        approx_chars = sum(len(str(m.get("content", ""))) for m in messages)
+        print(
+            f"[LLM] 请求开始 label={call_label} model={self.model} "
+            f"endpoint={_endpoint_summary(self.api_base)} "
+            f"messages={len(messages)} approx_chars={approx_chars}",
+            flush=True,
+        )
+        t0 = time.perf_counter()
+        try:
+            response = completion(**params)
+        except Exception as e:
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            print(
+                f"[LLM] 请求失败 label={call_label} model={self.model} "
+                f"耗时_ms={elapsed_ms:.0f} error={type(e).__name__}: {e}",
+                flush=True,
+            )
+            raise
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        print(
+            f"[LLM] 请求成功 label={call_label} model={self.model} "
+            f"耗时_ms={elapsed_ms:.0f} {_usage_summary(response)} "
+            f"reply_preview={_reply_preview(response)!r}",
+            flush=True,
+        )
 
         # 提取响应内容
         # 某些模型/提供商返回 list（内容块）而非 str，统一转为 str
