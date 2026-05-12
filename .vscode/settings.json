@@ -1,0 +1,10 @@
+{
+  "git.autoRepositoryDetection": true,
+  "git.detectSubmodules": true,
+  "git.repositoryScanMaxDepth": 3,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "task.allowAutomaticTasks": "on"
+}

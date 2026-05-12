@@ -1,0 +1,21 @@
+﻿---
+description: 全栈小功能（sensoube + senso_admin）— 复合路径、契约与测试（按需 @ 本规则）
+globs: sensoube/**/*,senso_admin/**/*
+alwaysApply: false
+---
+
+# 全栈功能（复合路径）
+
+在同时修改后端与管理端时使用；或在新会话中 **`@` 本规则** 再描述需求。更完整的角色说明见 [.ai/agents/fullstack_feature.md](.ai/agents/fullstack_feature.md)。
+
+## 顺序
+
+1. 读 [.ai/context/api_docs.md](.ai/context/api_docs.md)、必要时 [db_schema.md](.ai/context/db_schema.md)。
+2. 先 **`sensoube/`**：路由/模型/校验；变更接口或数据时更新 context。
+3. 再 **`senso_admin/`**：对齐契约与现有请求封装风格。
+4. 后端有改动时在 `sensoube/` 运行 **`npm test`**（`NODE_ENV=test`）。
+
+## 边界与安全
+
+- 仍遵守 [security-always.mdc](.cursor/rules/security-always.mdc)。
+- 单会话避免多个写入型 Subagent 同时改同一批文件（见 [.ai/README.md](.ai/README.md)）。

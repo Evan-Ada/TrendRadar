@@ -1,0 +1,19 @@
+# Cursor MCP 本地配置（常含数据库连接串、Token）；仓库内仅保留示例文件
+.cursor/mcp.json
+
+# 协作手册中的私密草稿目录（见 .ai/README.md）
+.ai/memory/local/
+
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 环境变量（若使用）
+.env
+.env.local
+*.local.env

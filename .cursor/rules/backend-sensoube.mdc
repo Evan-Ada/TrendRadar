@@ -1,0 +1,53 @@
+---
+description: 后端 sensoube（Express/Mongoose）约定与边界
+globs: sensoube/**/*
+alwaysApply: false
+---
+
+# sensoube
+
+- 变更仅限本目录；不改 `senso_admin/`。
+- 遵循既有路由与中间件模式；接口变更同步 [.ai/context/api_docs.md](.ai/context/api_docs.md)。
+- 模型或索引变更同步 [.ai/context/db_schema.md](.ai/context/db_schema.md)。
+- 新增路由应有测试；合并前在仓库根或 `sensoube` 下运行 `npm test`。
+- 不写密钥入仓库；日志不脱敏敏感令牌。
+
+## 新增 HTTP 接口约定（简）
+
+- 请求方法：增删改查操作优先使用 **POST**（与现有管理端/多数业务接口一致）。
+- 响应：成功与业务错误优先使用 [`utils/middleware`](../../sensoube/utils/middleware.js) 的 **`sendResponse(res, statusCode, message, data?)`**，保持 `{ success, message, data }` 形状；Joi **`validate`** 中间件产生的校验失败格式不变。
+- 入参：请求体用 **Joi + `validate`**（[`utils/validate.js`](../../sensoube/utils/validate.js)），与邻近代码风格一致。多处共用的 **必填** `start_time` / `end_time` 用 **`timeRangeRequiredFields`**；若业务允许起止均不传或为空，用 **`timeRangeOptionalFields`** 再组合专用 schema。
+- 路由最后一级：使用 **camelCase**，新建接口命名宜**具体、可 `rg` 全仓库检索**（降低与 v1/v2/v3 其它模块同名概率）；契约在 [`.ai/context/api_docs.md`](.ai/context/api_docs.md) 中写**完整路径**。
+- 可复制骨架：见 [`.ai/templates/api_endpoint_snippet.md`](../../.ai/templates/api_endpoint_snippet.md)。
+
+## 路由单文件结构（四段，自上而下）
+
+置于 [`sensoube/routes/`](../../sensoube/routes/) 下各路由文件时，**新代码**推荐按下述顺序组织（顶层 `require` 之下）；**存量文件不必为对齐规范而整文件重写**，可在本次变更触及该文件时再分段整理。
+
+1. **引用**：`express`、`router`、`mongoose`、模型、`utils`（`validate`、`asyncHandler`、`sendResponse`）、`Joi` 等。
+2. **接口入参校验**：Joi + `BaseSchema` 的 schema 常量，命名 **`xxxSchema`**（camelCase + `Schema` 后缀）。
+3. **本文件通用方法**：仅在本 router 内多处复用的函数；跨文件共用则抽到 [`sensoube/utils/`](../../sensoube/utils/) 等。
+4. **接口实现**：`router.get|post|...`，文末 `module.exports = router`（若适用）。**路由注册整行书写**：路径、`validate(...)`、`asyncHandler(...)` 等中间件链写在**同一行**，不拆成多行；handler 函数体内照常换行。
+
+## 命名约定（新代码）
+
+- **HTTP 契约中的字段**（body / query / path 在 api_docs 中的名称）：**snake_case**。示例：`message_list_id`、`message_detail_id`、`message_detail_id_list`。（拼写为 **detail**，勿写成 deatil。）
+- **顶层引入的 Mongoose 模型**：小驼峰且 **以 `T` 结尾**，表示表/集合，例如：`const messageDetailT = require('../../../models/messageD')`。存量文件中已有的 `MessageDetail`、`messageList` 等名可保留；**新建或在本文件内重写引入处时**再改为 `*T`。
+- **路由 handler 内部局部变量**：**snake_case**，例如：`const message_list = await messageListT.findOne(...)`。
+- **`router` 实例名**：保持 **`router`**（Express 惯例）。
+- **`req.validatedData` 解构**：与 Joi 中字段名一致（snake_case），避免无谓再转为 camelCase。
+- **路由路径最后一级**：仍为 **camelCase**（与「契约字段 snake_case」并存：路径 camelCase，体参 snake_case）。
+- **Schema 常量名**：保持 **`xxxSchema`**（camelCase），与 Joi 习惯一致；与「契约字段 snake_case」区分。**新建 schema 名称长度建议不超过约 20 个字符**（含 `Schema` 后缀），避免冗长难辨（例如用领域缩写：`perfLogsAggSchema`，而非整句拼接）。
+
+## 路由实现注释
+
+- **不在** `router.post(...)` / `router.get(...)` **等注册语句紧上方**写块注释或 JSDoc（新代码）。存量注释可随改动逐步删减，不做一次性全库清理。
+
+## 与存量代码及破坏性变更
+
+- **不对老代码做强行全量重构**；**今后新写或当次编辑到的路由**按本章与「新增 HTTP 接口约定」实现即可。
+- **已发布接口若要改请求字段名**，按破坏性变更处理（版本、过渡期双字段、迁移说明等），不做「规范驱动的批量改名」。
+
+## 与 `.ai/context` 的关系
+
+路由四段式与命名的详细说明曾落在 [`.ai/context/sensoube_route_conventions.md`](../../.ai/context/sensoube_route_conventions.md)；**以本 `.mdc` 为唯一正文**。该文件仅作入口跳转，避免双份维护。

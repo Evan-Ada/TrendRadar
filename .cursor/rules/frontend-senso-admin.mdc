@@ -1,0 +1,13 @@
+---
+description: 前端 senso_admin（Vue/Vite）约定与边界
+globs: senso_admin/**/*
+alwaysApply: false
+---
+
+# senso_admin
+
+- 变更仅限本目录；不改 `sensoube/`。
+- API 契约以后端与 [.ai/context/api_docs.md](.ai/context/api_docs.md) 为准。
+- 保持与现有组件、请求封装、样式组织一致。
+- **请求路径写法**：在 `src/api/` 等封装里优先 **每条接口写完整路径字符串**（相对 axios `baseURL`，例如 `'/v3/web/ReportCenter/overview'`），与后端契约一行对照、`rg` 全仓库可搜；**不强制**抽公共前缀常量（如 `const RC = '...'`），除非文件内已有多处一致用法且团队约定合并。
+- **`reportApi` / 同类封装的方法名**（camelCase）：**建议总长不超过约 20 个字符，原则上不超过 25**；在长度限制内需 **能看出业务语义**（例如「聊天条数趋势」「注销趋势」「慢接口日志」），避免冗长拼接（如过度堆砌 `Api`、`Performance`、`Messages`）。宁可略缩写（`Trend`、`Msg`、`Sub`）也不失语义。
